@@ -13,13 +13,13 @@ interface IPatient {
 interface IPatientDoc extends IPatient, Document {}
 
 const patientSchema = new Schema<IPatientDoc>(
-    {
+    {   
         patient_id: { type: String, required: true },
         owner: { type: String, required: true },
         content: [{ type: mongoose.Schema.Types.Mixed }],
         sharedWith: { type: Map, of: String },
         history: [{ type: mongoose.Schema.Types.Mixed }],
-        accessRequests: [String],
+        accessRequests: [{ type: String }],
     },
     {
         timestamps: true,
