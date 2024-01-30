@@ -1,11 +1,10 @@
 import { Context } from 'hono';
 import { User } from '../models';
-import { genToken } from '../utils';
 
 /**
  * @api {get} /users Get All Users
  * @apiGroup Users
- * @access Private
+ * @access Public
  */
 export const getUsers = async (c: Context) => {
     const users = await User.find();
@@ -14,24 +13,36 @@ export const getUsers = async (c: Context) => {
 };
 
 /**
+ * @api {get} /users/:address Get User By Address
+ * @apiGroup Users
+ * @access Public
+ */
+export const getUserByAddress = async (c: Context) => {
+    const { address } = c.req.param();
+
+    const user = await User.findOne({ address });
+
+    if (!user) {
+        c.status(404);
+        throw new Error('User not found');
+    }
+
+    return c.json(user);
+};
+
+/**
  * @api {post} /users Create User
  * @apiGroup Users
  * @access Public
  */
 export const createUser = async (c: Context) => {
-    const { name, email, password } = await c.req.json();
-
-    // Check for existing user
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-        c.status(400);
-        throw new Error('User already exists');
-    }
+    const { address, name, healthcareType, organizationName } = await c.req.json();
 
     const user = await User.create({
+        address,
         name,
-        email,
-        password,
+        healthcareType,
+        organizationName,
     });
 
     if (!user) {
@@ -39,57 +50,40 @@ export const createUser = async (c: Context) => {
         throw new Error('Invalid user data');
     }
 
-    const token = await genToken(user._id.toString());
-
-    return c.json({
-        success: true,
-        data: {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-        },
-        token,
-        message: 'User created successfully',
-    });
+    c.status(201);
+    return c.json(user);
 };
 
 /**
- * @api {post} /users/login Login User
+ * @api {patch} /users/:address Update User
  * @apiGroup Users
  * @access Public
  */
-export const loginUser = async (c: Context) => {
-    const { email, password } = await c.req.json();
+export const updateUserByAddress = async (c: Context) => {
+    const { address } = c.req.param();
+    const { name, healthcareType, organizationName } = await c.req.json();
 
-    // Check for existing user
-    if (!email || !password) {
-        c.status(400);
-        throw new Error('Please provide an email and password');
-    }
+    const user = await User.findOne({ address });
 
-    const user = await User.findOne({ email });
     if (!user) {
-        c.status(401);
-        throw new Error('No user found with this email');
+        c.status(404);
+        throw new Error('User not found');
     }
 
-    if (!(await user.mathPassword(password))) {
-        c.status(401);
-        throw new Error('Invalid credentials');
-    } else {
-        const token = await genToken(user._id.toString());
+    await user.updateOne({ name, healthcareType, organizationName });
 
-        return c.json({
-            success: true,
-            data: {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                isAdmin: user.isAdmin,
-            },
-            token,
-            message: 'User logged in successfully',
-        });
-    }
+    return c.json({ message: `User with address ${address} successfully updated.` });
+};
+
+/**
+ * @api {delete} /users/:address Delete User
+ * @apiGroup Users
+ * @access Public
+ */
+export const deleteUserByAddress = async (c: Context) => {
+    const { address } = c.req.param();
+
+    await User.deleteOne({ address });
+
+    return c.json({ message: `User with address ${address} successfully deleted.` });
 };

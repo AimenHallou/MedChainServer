@@ -1,27 +1,21 @@
 import { Hono } from 'hono';
 import { user } from '../controllers';
-import { isAdmin, protect } from '../middlewares';
 
 const users = new Hono();
 
 // Get All Users
-users.get('/', protect, isAdmin, (c) => user.getUsers(c));
+users.get('/', (c) => user.getUsers(c));
+
+// Get User By Address
+users.get('/:address', (c) => user.getUserByAddress(c));
 
 // Create User
 users.post('/', (c) => user.createUser(c));
 
-// Login User
-users.post('/login', (c) => user.loginUser(c));
+// Update User By Address
+users.patch('/:address', (c) => user.updateUserByAddress(c));
 
-// Get Single User
-users.get('/:id', (c) => {
-    const id = c.req.param('id');
-    return c.json({ message: `User ${id}` });
-});
-
-// Get User Profile
-users.get('/profile', (c) => {
-    return c.json({ message: 'User Profile' });
-});
+// Delete User By Address
+users.delete('/:address', (c) => user.deleteUserByAddress(c));
 
 export default users;
