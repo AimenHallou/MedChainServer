@@ -1,34 +1,8 @@
 import { Context } from 'hono';
 import { User } from '../models';
-
-/**
- * @api {get} /users Get All Users
- * @apiGroup Users
- * @access Public
- */
-export const getUsers = async (c: Context) => {
-    const users = await User.find();
-
-    return c.json({ users });
-};
-
-/**
- * @api {get} /users/:address Get User By Address
- * @apiGroup Users
- * @access Public
- */
-export const getUserByAddress = async (c: Context) => {
-    const { address } = c.req.param();
-
-    const user = await User.findOne({ address });
-
-    if (!user) {
-        c.status(404);
-        throw new Error('User not found');
-    }
-
-    return c.json(user);
-};
+import { genToken } from '../utils';
+import { Document } from 'mongoose';
+import { IUserDoc } from '../models/User';
 
 /**
  * @api {post} /users Create User
@@ -36,10 +10,19 @@ export const getUserByAddress = async (c: Context) => {
  * @access Public
  */
 export const createUser = async (c: Context) => {
-    const { address, name, healthcareType, organizationName } = await c.req.json();
+    const { username, password, name, healthcareType, organizationName } = await c.req.json();
+
+    console.log(username);
+    // Check for existing user
+    const userExists = await User.findOne({ username });
+    if (userExists) {
+        c.status(400);
+        throw new Error('User already exists');
+    }
 
     const user = await User.create({
-        address,
+        username,
+        password,
         name,
         healthcareType,
         organizationName,
@@ -51,39 +34,140 @@ export const createUser = async (c: Context) => {
     }
 
     c.status(201);
-    return c.json(user);
+
+    const token = await genToken(user._id.toString());
+
+    return c.json({
+        success: true,
+        data: user,
+        token,
+        message: 'User created successfully',
+    });
 };
 
 /**
- * @api {patch} /users/:address Update User
+ * @api {post} /users/login Login User
  * @apiGroup Users
  * @access Public
  */
-export const updateUserByAddress = async (c: Context) => {
-    const { address } = c.req.param();
-    const { name, healthcareType, organizationName } = await c.req.json();
+export const loginUser = async (c: Context) => {
+    const { username, password } = await c.req.json();
 
-    const user = await User.findOne({ address });
-
-    if (!user) {
-        c.status(404);
-        throw new Error('User not found');
+    // Check for existing user
+    if (!username || !password) {
+        c.status(400);
+        throw new Error('Please provide a username and password');
     }
 
-    await user.updateOne({ name, healthcareType, organizationName });
+    const user = await User.findOne({ username });
+    if (!user) {
+        c.status(401);
+        throw new Error('No user found with this username');
+    }
 
-    return c.json({ message: `User with address ${address} successfully updated.` });
+    if (!(await user.mathPassword(password))) {
+        c.status(401);
+        throw new Error('Invalid credentials');
+    } else {
+        const token = await genToken(user._id.toString());
+
+        return c.json({
+            success: true,
+            data: user,
+            token,
+            message: 'User logged in successfully',
+        });
+    }
+};
+
+export const updateAddress = async (c: Context) => {
+    const { address } = await c.req.json();
+    const user: typeof User = c.get('user');
+
+    if (!user) {
+        c.status(401);
+        throw new Error('Not authorized');
+    }
+
+    await user.updateOne({ address });
+
+    return c.json({ message: 'Address updated successfully' });
 };
 
 /**
- * @api {delete} /users/:address Delete User
+ * @api {get} /users/me Get Me
  * @apiGroup Users
- * @access Public
+ * @access Private
  */
-export const deleteUserByAddress = async (c: Context) => {
-    const { address } = c.req.param();
+export const getMe = async (c: Context) => {
+    const user = c.get('user');
 
-    await User.deleteOne({ address });
+    if (!user) {
+        c.status(401);
+        throw new Error('Not authorized');
+    }
 
-    return c.json({ message: `User with address ${address} successfully deleted.` });
+    return c.json({ user });
+};
+
+/**
+ * @api {post} /users/linkAddress Link Address
+ * @apiGroup Users
+ * @access Private
+ */
+export const linkAddress = async (c: Context) => {
+    const { address } = await c.req.json();
+
+    if (!address) {
+        c.status(400);
+        throw new Error('Address is required');
+    }
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        c.status(401);
+        throw new Error('Not authorized');
+    }
+
+    if (user.address) {
+        c.status(400);
+        throw new Error('Address already linked');
+    }
+
+    const addressTaken = await User.findOne({ address });
+
+    if (addressTaken) {
+        c.status(400);
+        throw new Error('Address already linked to another user');
+    }
+
+    const updated = await User.findByIdAndUpdate(user._id, { address }, { new: true });
+
+    return c.json({ data: updated, message: 'Address linked successfully' });
+};
+
+/**
+ * @api {post} /users/unlinkAddress Unlink Address
+ * @apiGroup Users
+ * @access Private
+ */
+export const unlinkAddress = async (c: Context) => {
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        c.status(401);
+        throw new Error('Not authorized');
+    }
+
+    if (!user.address) {
+        c.status(400);
+        throw new Error('No address linked');
+    }
+
+    const updated = await User.findByIdAndUpdate(user._id, { address: '' }, { new: true });
+
+    console.log(updated);
+
+    return c.json({ data: updated, message: 'Address unlinked successfully' });
 };
