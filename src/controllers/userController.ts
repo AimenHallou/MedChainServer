@@ -9,23 +9,24 @@ import { IUserDoc } from '../models/User';
  * @apiGroup Users
  * @access Public
  */
-export const createUser = async (c: Context) => {
-    const { username, password, name, healthcareType, organizationName } = await c.req.json();
+export const register = async (c: Context) => {
+    const { username, password } = await c.req.json();
 
-    console.log(username);
+    if (!username || !password) {
+        c.status(400);
+        throw new Error('Please provide a username and password');
+    }
+
     // Check for existing user
     const userExists = await User.findOne({ username });
     if (userExists) {
         c.status(400);
-        throw new Error('User already exists');
+        throw new Error('Username has been taken');
     }
 
     const user = await User.create({
         username,
         password,
-        name,
-        healthcareType,
-        organizationName,
     });
 
     if (!user) {
@@ -39,7 +40,7 @@ export const createUser = async (c: Context) => {
 
     return c.json({
         success: true,
-        data: user,
+        user: user,
         token,
         message: 'User created successfully',
     });
@@ -50,7 +51,7 @@ export const createUser = async (c: Context) => {
  * @apiGroup Users
  * @access Public
  */
-export const loginUser = async (c: Context) => {
+export const login = async (c: Context) => {
     const { username, password } = await c.req.json();
 
     // Check for existing user
@@ -73,25 +74,11 @@ export const loginUser = async (c: Context) => {
 
         return c.json({
             success: true,
-            data: user,
+            user: user,
             token,
             message: 'User logged in successfully',
         });
     }
-};
-
-export const updateAddress = async (c: Context) => {
-    const { address } = await c.req.json();
-    const user: typeof User = c.get('user');
-
-    if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
-    }
-
-    await user.updateOne({ address });
-
-    return c.json({ message: 'Address updated successfully' });
 };
 
 /**
@@ -108,6 +95,26 @@ export const getMe = async (c: Context) => {
     }
 
     return c.json({ user });
+};
+
+/**
+ * @api {post} /users/updateDetails Update Details
+ * @apiGroup Users
+ * @access Private
+ */
+export const updateDetails = async (c: Context) => {
+    const { name, healthcareType, organizationName } = await c.req.json();
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        c.status(401);
+        throw new Error('Not authorized');
+    }
+
+    const updated = await User.findByIdAndUpdate(user._id, { name, healthcareType, organizationName }, { new: true });
+
+    return c.json({ user: updated, message: 'Details updated successfully' });
 };
 
 /**
@@ -144,7 +151,7 @@ export const linkAddress = async (c: Context) => {
 
     const updated = await User.findByIdAndUpdate(user._id, { address }, { new: true });
 
-    return c.json({ data: updated, message: 'Address linked successfully' });
+    return c.json({ user: updated, message: 'Address linked successfully' });
 };
 
 /**
@@ -169,5 +176,5 @@ export const unlinkAddress = async (c: Context) => {
 
     console.log(updated);
 
-    return c.json({ data: updated, message: 'Address unlinked successfully' });
+    return c.json({ user: updated, message: 'Address unlinked successfully' });
 };

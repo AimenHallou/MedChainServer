@@ -4,13 +4,13 @@ import { protect } from '../middlewares';
 
 const users = new Hono();
 
-// Create User
-users.post('/register', (c) => user.createUser(c));
+users.post('/register', (c) => user.register(c));
 
-// Login User
-users.post('/login', (c) => user.loginUser(c));
+users.post('/login', (c) => user.login(c));
 
 users.get('/me', protect, (c) => user.getMe(c));
+
+users.patch('/updateDetails', protect, (c) => user.updateDetails(c));
 
 users.post('/linkAddress', protect, (c) => user.linkAddress(c));
 

@@ -5,6 +5,7 @@ const connectDB = async () => {
         if (Bun.env.MONGO_URI !== undefined) {
             const conn = await mongoose.connect(Bun.env.MONGO_URI, {
                 autoIndex: true,
+                dbName: 'medchain',
             });
 
             console.log(`MongoDB Connected: ${conn.connection.host}`);
