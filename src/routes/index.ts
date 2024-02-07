@@ -1,2 +1,2 @@
 export { default as Users } from './userRoute';
-export { default as Patient } from './patientRoute';
+export { default as Patients } from './patientRoute';
