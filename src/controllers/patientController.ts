@@ -12,7 +12,7 @@ import { HTTPException } from 'hono/http-exception';
 export const getPatients = async (c: Context) => {
     const { limit = 15, page = 0 } = c.req.query();
 
-    const patients = await Patient.find({}, null, { limit: limit as number, skip: (page as number) * (limit as number) });
+    const patients = await Patient.find({}, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort({ createdAt: -1 });
 
     return c.json({ patients });
 };
