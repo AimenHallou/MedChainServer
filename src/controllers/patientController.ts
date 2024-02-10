@@ -10,11 +10,24 @@ import { HTTPException } from 'hono/http-exception';
  * @access Public
  */
 export const getPatients = async (c: Context) => {
-    const { limit = 15, page = 0 } = c.req.query();
+    const { limit = 15, page = 0, filter } = c.req.query();
 
-    const patients = await Patient.find({}, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort({ createdAt: -1 });
+    console.log(filter);
 
-    return c.json({ patients });
+    let searchQuery = {};
+
+    if (filter) {
+        searchQuery = {
+            $or: [{ patient_id: { $regex: filter, $options: 'i' } }, { owner: { $regex: filter, $options: 'i' } }],
+        };
+    }
+
+    const totalCount = await Patient.countDocuments(searchQuery);
+    const patients = await Patient.find(searchQuery, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort({ createdAt: -1 });
+
+    const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
+
+    return c.json({ patients, hasMore, totalCount });
 };
 
 /**
