@@ -10,9 +10,7 @@ import { HTTPException } from 'hono/http-exception';
  * @access Public
  */
 export const getPatients = async (c: Context) => {
-    const { limit = 15, page = 0, filter } = c.req.query();
-
-    console.log(filter);
+    const { limit = 15, page = 0, filter, sortBy = 'createdAt', sortOrder = -1 } = c.req.query();
 
     let searchQuery = {};
 
@@ -22,8 +20,18 @@ export const getPatients = async (c: Context) => {
         };
     }
 
+    let sort = {};
+
+    if (sortBy === 'createdAt') {
+        sort = { createdAt: Number(sortOrder) };
+    } else if (sortBy === 'patient_id') {
+        sort = { patient_id: Number(sortOrder) };
+    }
+
+    console.log(sort);
+
     const totalCount = await Patient.countDocuments(searchQuery);
-    const patients = await Patient.find(searchQuery, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort({ createdAt: -1 });
+    const patients = await Patient.find(searchQuery, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort(sort);
 
     const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
 
