@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { Patient } from '../models';
-import { IUserDoc } from '../models/User';
-import { EventType, IHistoryEvent } from '../models/Patient';
+import User, { IUserDoc } from '../models/User';
+import { EventType, IFile, IHistoryEvent } from '../models/Patient';
 import { HTTPException } from 'hono/http-exception';
 
 /**
@@ -71,8 +71,7 @@ export const createPatient = async (c: Context) => {
     const { patient_id, content, sharedWith, accessRequests } = await c.req.json();
 
     if (!patient_id) {
-        c.status(400);
-        throw new Error('Patient ID is required');
+        throw new HTTPException(400, { message: 'Patient id is required' });
     }
 
     const patientExists = await Patient.findOne({ patient_id });
@@ -84,13 +83,11 @@ export const createPatient = async (c: Context) => {
     const user: IUserDoc = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
+        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
     const createdEvent: IHistoryEvent = {
@@ -134,7 +131,9 @@ export const getPatientByPatientId = async (c: Context) => {
         throw new Error('Patient not found');
     }
 
-    return c.json({ patient });
+    const owner = await User.findOne({ address: patient.owner });
+
+    return c.json({ patient, owner });
 };
 
 /**
@@ -536,55 +535,53 @@ export const unshareWith = async (c: Context) => {
  * @apiGroup Patients
  * @access Private
  */
-export const addFile = async (c: Context) => {
+export const addFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
-    const { file } = await c.req.parseBody();
+    const { files } = await c.req.json();
+
+    if (!files || files.length === 0) {
+        throw new HTTPException(400, { message: 'Files are required' });
+    }
 
     const patient = await Patient.findOne({ patient_id });
 
     if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
+        throw new HTTPException(404, { message: 'Patient not found' });
     }
 
     const user: IUserDoc = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
-    }
-
-    if (!file || !(file as File).name || !(file as File).type || !(file as File).size) {
-        c.status(400);
-        throw new Error('File is required');
+        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
     if (patient.owner !== user.address) {
-        c.status(400);
-        throw new Error('You are not the owner of this patient');
+        throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
-    const content: File[] = [...patient.content];
+    const history = [...patient.history];
 
-    if (content.some((f) => (f as File).name === (file as File).name)) {
-        c.status(400);
-        throw new Error('File with this name already exists');
-    }
+    const mappedFiles = (files as IFile[]).map((f) => {
+        const event: IHistoryEvent = {
+            eventType: EventType.FILE_ADDED,
+            timestamp: new Date(),
+            fileName: f.name,
+        };
 
-    content.push(file as File);
+        history.unshift(event);
 
-    const addedEvent: IHistoryEvent = {
-        eventType: EventType.FILE_ADDED,
-        timestamp: new Date(),
-        fileName: (file as File).name,
-    };
+        return {
+            base64: f.base64!,
+            name: f.name,
+            dataType: f.dataType,
+        };
+    });
 
-    const history = [addedEvent, ...patient.history];
+    const content: IFile[] = [...patient.content, ...mappedFiles];
 
     const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { content, history }, { new: true });
 

@@ -16,7 +16,7 @@ patients.post('/', protect, (c) => patient.createPatient(c));
 
 patients.post('/:patient_id/accept-request', protect, (c) => patient.acceptRequest(c));
 
-patients.post('/:patient_id/add-file', protect, (c) => patient.addFile(c));
+patients.post('/:patient_id/add-files', protect, (c) => patient.addFiles(c));
 
 patients.post('/:patient_id/remove-file', protect, (c) => patient.removeFile(c));
 

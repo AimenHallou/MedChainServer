@@ -60,11 +60,30 @@ const historyEventSchema = new Schema<IHistoryEvent>({
     },
 });
 
+export interface IFile {
+    base64: string;
+    name: string;
+    dataType: string;
+    ipfsCID?: string;
+}
+
+const fileSchema = new Schema<IFile>(
+    {
+        base64: { type: String, required: true },
+        name: { type: String, required: true },
+        dataType: { type: String, required: true },
+        ipfsCID: { type: String },
+    },
+    {
+        timestamps: true,
+    }
+);
+
 export interface IPatient {
     patient_id: string;
     owner: string;
     createdDate: Date;
-    content: any[];
+    content: IFile[];
     sharedWith: Map<string, string[]>;
     history: IHistoryEvent[];
     accessRequests: string[];
@@ -76,7 +95,7 @@ const patientSchema = new Schema<IPatientDoc>(
     {
         patient_id: { type: String, required: true },
         owner: { type: String, required: true },
-        content: [{ type: mongoose.Schema.Types.Mixed }],
+        content: [fileSchema],
         sharedWith: { type: Map, of: String },
         history: [historyEventSchema],
         accessRequests: [{ type: String }],
