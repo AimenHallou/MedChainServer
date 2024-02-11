@@ -14,15 +14,13 @@ export const register = async (c: Context) => {
     const { username, password } = await c.req.json();
 
     if (!username || !password) {
-        c.status(400);
-        throw new Error('Please provide a username and password');
+        throw new HTTPException(400, { message: 'Please provide a username and password' });
     }
 
     // Check for existing user
     const userExists = await User.findOne({ username });
     if (userExists) {
-        c.status(400);
-        throw new Error('Username has been taken');
+        throw new HTTPException(400, { message: 'User already exists' });
     }
 
     const user = await User.create({
@@ -31,8 +29,7 @@ export const register = async (c: Context) => {
     });
 
     if (!user) {
-        c.status(400);
-        throw new Error('Invalid user data');
+        throw new HTTPException(400, { message: 'Invalid user data' });
     }
 
     c.status(201);
@@ -57,19 +54,16 @@ export const login = async (c: Context) => {
 
     // Check for existing user
     if (!username || !password) {
-        c.status(400);
-        throw new Error('Please provide a username and password');
+        throw new HTTPException(400, { message: 'Please provide a username and password' });
     }
 
     const user = await User.findOne({ username });
     if (!user) {
-        c.status(401);
-        throw new Error('No user found with this username');
+        throw new HTTPException(401, { message: 'Invalid credentials' });
     }
 
     if (!(await user.mathPassword(password))) {
-        c.status(401);
-        throw new Error('Invalid credentials');
+        throw new HTTPException(401, { message: 'Invalid credentials' });
     } else {
         const token = await genToken(user._id.toString());
 
@@ -91,8 +85,7 @@ export const getMe = async (c: Context) => {
     const user = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     return c.json({ user });
@@ -109,8 +102,7 @@ export const updateDetails = async (c: Context) => {
     const user: IUserDoc = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     const updated = await User.findByIdAndUpdate(user._id, { name, healthcareType, organizationName }, { new: true });
@@ -160,18 +152,14 @@ export const unlinkAddress = async (c: Context) => {
     const user: IUserDoc = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     if (!user.address) {
-        c.status(400);
-        throw new Error('No address linked');
+        throw new HTTPException(400, { message: 'Address not linked' });
     }
 
     const updated = await User.findByIdAndUpdate(user._id, { address: '' }, { new: true });
-
-    console.log(updated);
 
     return c.json({ user: updated, message: 'Address unlinked successfully' });
 };
