@@ -3,6 +3,7 @@ import { User } from '../models';
 import { genToken } from '../utils';
 import { Document } from 'mongoose';
 import { IUserDoc } from '../models/User';
+import { HTTPException } from 'hono/http-exception';
 
 /**
  * @api {post} /users Create User
@@ -126,27 +127,23 @@ export const linkAddress = async (c: Context) => {
     const { address } = await c.req.json();
 
     if (!address) {
-        c.status(400);
-        throw new Error('Address is required');
+        throw new HTTPException(400, { message: 'Please provide an address' });
     }
 
     const user: IUserDoc = c.get('user');
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
     if (user.address) {
-        c.status(400);
-        throw new Error('Address already linked');
+        throw new HTTPException(400, { message: 'Address already linked' });
     }
 
     const addressTaken = await User.findOne({ address });
 
     if (addressTaken) {
-        c.status(400);
-        throw new Error('Address already linked to another user');
+        throw new HTTPException(400, { message: 'Address already linked to another user' });
     }
 
     const updated = await User.findByIdAndUpdate(user._id, { address }, { new: true });

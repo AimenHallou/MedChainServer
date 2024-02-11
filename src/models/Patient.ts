@@ -61,6 +61,7 @@ const historyEventSchema = new Schema<IHistoryEvent>({
 });
 
 export interface IFile {
+    _id?: string;
     base64: string;
     name: string;
     dataType: string;
@@ -96,7 +97,7 @@ const patientSchema = new Schema<IPatientDoc>(
         patient_id: { type: String, required: true },
         owner: { type: String, required: true },
         content: [fileSchema],
-        sharedWith: { type: Map, of: String },
+        sharedWith: { type: Map, of: [{ type: String }], default: new Map() },
         history: [historyEventSchema],
         accessRequests: [{ type: String }],
     },

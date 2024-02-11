@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { Patient } from '../models';
 import User, { IUserDoc } from '../models/User';
-import { EventType, IFile, IHistoryEvent } from '../models/Patient';
+import { EventType, FileModel, IFile, IHistoryEvent } from '../models/Patient';
 import { HTTPException } from 'hono/http-exception';
 
 /**
@@ -404,73 +404,6 @@ export const rejectRequest = async (c: Context) => {
 };
 
 /**
- * @api {post} /patients/:patient_id/share-with Share With
- * @apiGroup Patients
- * @access Private
- */
-export const shareWith = async (c: Context) => {
-    const { patient_id } = c.req.param();
-    const { address, files } = await c.req.parseBody();
-
-    if (!address) {
-        c.status(400);
-        throw new Error('Address is required');
-    }
-
-    if (!files || files.length === 0) {
-        c.status(400);
-        throw new Error('Files are required');
-    }
-
-    const patient = await Patient.findOne({ patient_id });
-
-    if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
-    }
-
-    const user: IUserDoc = c.get('user');
-
-    if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
-    }
-
-    if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
-    }
-
-    if (patient.owner !== user.address) {
-        c.status(400);
-        throw new Error('You are not the owner of this patient');
-    }
-
-    if (patient.sharedWith.has(address as string)) {
-        c.status(400);
-        throw new Error('Patient already shared with this address');
-    }
-
-    const sharedWith = new Map(patient.sharedWith);
-
-    const filesList = (files as File[]).map((f) => f.name);
-
-    sharedWith.set(address as string, filesList);
-
-    const sharedEvent: IHistoryEvent = {
-        eventType: EventType.SHARED_WITH,
-        timestamp: new Date(),
-        with: address as string,
-    };
-
-    const history = [sharedEvent, ...patient.history];
-
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history }, { new: true });
-
-    return c.json({ patient: updatedPatient, message: 'Patient shared' });
-};
-
-/**
  * @api {post} /patients/:patient_id/unshare-with Unshare With
  * @apiGroup Patients
  * @access Private
@@ -539,6 +472,8 @@ export const addFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
     const { files } = await c.req.json();
 
+    console.log(files);
+
     if (!files || files.length === 0) {
         throw new HTTPException(400, { message: 'Files are required' });
     }
@@ -589,17 +524,17 @@ export const addFiles = async (c: Context) => {
 };
 
 /**
- * @api {post} /patients/:patient_id/remove-file Remove File
+ * @api {delete} /patients/:patient_id/delete-files Delete Files
  * @apiGroup Patients
  * @access Private
  */
-export const removeFile = async (c: Context) => {
+export const deleteFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
-    const { fileName } = await c.req.json();
+    const { fileIds } = await c.req.json();
 
-    if (!fileName) {
+    if (!fileIds || fileIds.length === 0) {
         c.status(400);
-        throw new Error('File name is required');
+        throw new Error('File IDs are required');
     }
 
     const patient = await Patient.findOne({ patient_id });
@@ -626,69 +561,86 @@ export const removeFile = async (c: Context) => {
         throw new Error('You are not the owner of this patient');
     }
 
-    if (!patient.content.some((file) => (file as File).name === fileName)) {
-        c.status(400);
-        throw new Error('File not found on patient');
-    }
+    const content = patient.content.filter((f) => {
+        return !fileIds.includes(f._id?.toString());
+    });
 
-    const content = patient.content.filter((file) => (file as File).name !== fileName);
+    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { content }, { new: true });
 
-    const removedEvent: IHistoryEvent = {
-        eventType: EventType.FILE_REMOVED,
-        timestamp: new Date(),
-        fileName,
-    };
-
-    const history = [removedEvent, ...patient.history];
-
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { content, history }, { new: true });
-
-    return c.json({ patient: updatedPatient, message: 'File removed' });
+    return c.json({ patient: updatedPatient, message: 'Files removed' });
 };
 
 /**
- * @api {post} /patients/:patient_id/edit-file Edit File
+ * @api {post} /patients/:patient_id/share-files Share With
  * @apiGroup Patients
  * @access Private
  */
-export const editFile = async (c: Context) => {
+export const shareFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
-    const { fileName, file } = await c.req.parseBody();
+    const { address, fileIds } = await c.req.json();
 
-    if (!fileName) {
-        c.status(400);
-        throw new Error('File name is required');
+    if (!address) {
+        throw new HTTPException(400, { message: 'Address is required' });
     }
 
-    if (!file || !(file as File).name || !(file as File).type || !(file as File).size) {
-        c.status(400);
-        throw new Error('File is required');
+    if (!fileIds || fileIds.length === 0) {
+        throw new HTTPException(400, { message: 'File IDs are required' });
+    }
+
+    const recipient = await User.findOne({ address });
+
+    if (!recipient) {
+        throw new HTTPException(404, { message: 'Recipient not found' });
     }
 
     const patient = await Patient.findOne({ patient_id });
 
     if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
+        throw new HTTPException(404, { message: 'Patient not found' });
     }
 
-    const content = patient.content.map((f) => {
-        if ((f as File).name === fileName) {
-            return file as File;
-        }
+    const user: IUserDoc = c.get('user');
 
-        return f;
+    if (!user) {
+        throw new HTTPException(401, { message: 'Not authorized' });
+    }
+
+    if (!user.address) {
+        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
+    }
+
+    if (user.address === address) {
+        throw new HTTPException(400, { message: 'You cannot share with yourself' });
+    }
+
+    if (patient.owner !== user.address) {
+        throw new HTTPException(400, { message: 'You are not the owner of this patient' });
+    }
+
+    const sharedWith = new Map(patient.sharedWith);
+
+    const sharedWithfiles = new Set(sharedWith.get(address as string) || []);
+
+    fileIds.forEach((id: string) => {
+        sharedWithfiles.add(id);
     });
 
-    const updatedEvent: IHistoryEvent = {
-        eventType: EventType.FILE_UPDATED,
-        timestamp: new Date(),
-        fileName: (file as File).name,
-    };
+    const history = [...patient.history];
 
-    const history = [updatedEvent, ...patient.history];
+    if (sharedWithfiles.size > (sharedWith.get(address as string)?.length || 0)) {
+        const sharedEvent: IHistoryEvent = {
+            eventType: EventType.SHARED_WITH,
+            timestamp: new Date(),
+            with: address as string,
+        };
 
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { content, history }, { new: true });
+        history.unshift(sharedEvent);
+    }
 
-    return c.json({ patient: updatedPatient, message: 'File updated' });
+    sharedWith.set(address as string, Array.from(sharedWithfiles));
+
+    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history }, { new: true });
+
+    console.log(updatedPatient?.sharedWith);
+    return c.json({ patient: updatedPatient, message: 'Patient shared' });
 };

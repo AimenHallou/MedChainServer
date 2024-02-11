@@ -18,17 +18,15 @@ patients.post('/:patient_id/accept-request', protect, (c) => patient.acceptReque
 
 patients.post('/:patient_id/add-files', protect, (c) => patient.addFiles(c));
 
-patients.post('/:patient_id/remove-file', protect, (c) => patient.removeFile(c));
+patients.delete('/:patient_id/delete-files', protect, (c) => patient.deleteFiles(c));
+
+patients.post('/:patient_id/share-files', protect, (c) => patient.shareFiles(c));
 
 patients.post('/:patient_id/reject-request', protect, (c) => patient.rejectRequest(c));
-
-patients.post('/:patient_id/edit-file', protect, (c) => patient.editFile(c));
 
 patients.post('/:patient_id/request-access', protect, (c) => patient.requestAccess(c));
 
 patients.post('/:patient_id/cancel-request', protect, (c) => patient.cancelRequest(c));
-
-patients.post('/:patient_id/share-with', protect, (c) => patient.shareWith(c));
 
 patients.post('/:patient_id/unshare-with', protect, (c) => patient.unshareWith(c));
 
