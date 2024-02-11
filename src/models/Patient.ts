@@ -82,7 +82,7 @@ const fileSchema = new Schema<IFile>(
 
 export interface IPatient {
     patient_id: string;
-    owner: string;
+    owner_id: string;
     createdDate: Date;
     content: IFile[];
     sharedWith: Map<string, string[]>;
@@ -95,7 +95,7 @@ export interface IPatientDoc extends IPatient, Document {}
 const patientSchema = new Schema<IPatientDoc>(
     {
         patient_id: { type: String, required: true },
-        owner: { type: String, required: true },
+        owner_id: { type: String, required: true },
         content: [fileSchema],
         sharedWith: { type: Map, of: [{ type: String }], default: new Map() },
         history: [historyEventSchema],

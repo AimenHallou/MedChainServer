@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { Jwt } from 'hono/utils/jwt';
 //
 import { User } from '../models';
+import { HTTPException } from 'hono/http-exception';
 
 // Protect Route for Authenticated Users
 export const protect = async (c: Context, next: Next) => {
@@ -20,12 +21,12 @@ export const protect = async (c: Context, next: Next) => {
 
             await next();
         } catch (err) {
-            throw new Error('Invalid token! You are not authorized!');
+            throw new HTTPException(401, { message: 'Not authorized to access this route' });
         }
     }
 
     if (!token) {
-        throw new Error('Not authorized! No token found!');
+        throw new HTTPException(401, { message: 'Not authorized to access this route' });
     }
 };
 
@@ -37,6 +38,6 @@ export const isAdmin = async (c: Context, next: Next) => {
         await next();
     } else {
         c.status(401);
-        throw new Error('Not authorized as an admin!');
+        throw new HTTPException(401, { message: 'Not authorized as an admin' });
     }
 };

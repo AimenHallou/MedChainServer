@@ -4,13 +4,13 @@ import { protect } from '../middlewares';
 
 const patients = new Hono();
 
-patients.get('/', (c) => patient.getPatients(c));
+patients.get('/', protect, (c) => patient.getPatients(c));
 
-patients.get('/count', (c) => patient.getPatientsCount(c));
+patients.get('/count', protect, (c) => patient.getPatientsCount(c));
 
-patients.get('/recent/:limit', (c) => patient.getRecentPatients(c));
+patients.get('/recent/:limit', protect, (c) => patient.getRecentPatients(c));
 
-patients.get('/:patient_id', (c) => patient.getPatientByPatientId(c));
+patients.get('/:patient_id', protect, (c) => patient.getPatientByPatientId(c));
 
 patients.post('/', protect, (c) => patient.createPatient(c));
 

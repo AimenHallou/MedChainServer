@@ -1,8 +1,8 @@
 import { Context } from 'hono';
-import { Patient } from '../models';
-import User, { IUserDoc } from '../models/User';
-import { EventType, FileModel, IFile, IHistoryEvent } from '../models/Patient';
 import { HTTPException } from 'hono/http-exception';
+import { Patient } from '../models';
+import { EventType, IFile, IHistoryEvent } from '../models/Patient';
+import User, { IUserDoc } from '../models/User';
 
 /**
  * @api {get} /patients Get Patients
@@ -100,7 +100,7 @@ export const createPatient = async (c: Context) => {
 
     const patient = await Patient.create({
         patient_id,
-        owner: user.address,
+        owner_id: user._id,
         content,
         sharedWith,
         history,
@@ -127,11 +127,29 @@ export const getPatientByPatientId = async (c: Context) => {
     const patient = await Patient.findOne({ patient_id });
 
     if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
+        throw new HTTPException(404, { message: 'Patient not found' });
     }
 
-    const owner = await User.findOne({ address: patient.owner });
+    const owner = await User.findById(patient.owner_id);
+
+    console.log(owner);
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        patient.content = [];
+        return c.json({ patient, owner });
+    }
+
+    const sharedWith = new Map(patient.sharedWith);
+
+    if (sharedWith.has(user.address)) {
+        const files = sharedWith.get(user.address);
+
+        patient.content = patient.content.filter((f) => files?.includes(f._id || ''));
+
+        return c.json({ patient, owner });
+    }
 
     return c.json({ patient, owner });
 };
@@ -164,7 +182,7 @@ export const transferOwnership = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner === user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are the owner of this patient');
     }
@@ -209,7 +227,7 @@ export const requestAccess = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner === user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are the owner of this patient');
     }
@@ -319,7 +337,7 @@ export const acceptRequest = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -378,7 +396,7 @@ export const rejectRequest = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -436,7 +454,7 @@ export const unshareWith = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -494,7 +512,7 @@ export const addFiles = async (c: Context) => {
         throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
@@ -556,7 +574,7 @@ export const deleteFiles = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -613,7 +631,7 @@ export const shareFiles = async (c: Context) => {
         throw new HTTPException(400, { message: 'You cannot share with yourself' });
     }
 
-    if (patient.owner !== user.address) {
+    if (patient.owner_id === user._id.toString()) {
         throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
