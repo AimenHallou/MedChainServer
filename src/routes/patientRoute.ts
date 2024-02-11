@@ -20,9 +20,13 @@ patients.delete('/:patient_id/delete-files', protect, (c) => patient.deleteFiles
 
 patients.post('/:patient_id/share-files', protect, (c) => patient.shareFiles(c));
 
-// patients.post('/:patient_id/accept-request', protect, (c) => patient.acceptRequest(c));
+patients.post('/:patient_id/request-access', protect, (c) => patient.requestAccess(c));
 
-// patients.post('/:patient_id/reject-request', protect, (c) => patient.rejectRequest(c));
+patients.post('/:patient_id/cancel-access-request', protect, (c) => patient.cancelRequest(c));
+
+patients.post('/:patient_id/reject-access-request', protect, (c) => patient.rejectRequest(c));
+
+// patients.post('/:patient_id/accept-request', protect, (c) => patient.acceptRequest(c));
 
 // patients.post('/:patient_id/request-access', protect, (c) => patient.requestAccess(c));
 
