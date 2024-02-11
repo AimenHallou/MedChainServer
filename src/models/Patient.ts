@@ -61,14 +61,15 @@ const historyEventSchema = new Schema<IHistoryEvent>({
 });
 
 export interface IFile {
-    _id?: string;
     base64: string;
     name: string;
     dataType: string;
     ipfsCID?: string;
 }
 
-const fileSchema = new Schema<IFile>(
+export interface IFileDoc extends IFile, Document {}
+
+const fileSchema = new Schema<IFileDoc>(
     {
         base64: { type: String, required: true },
         name: { type: String, required: true },
@@ -84,7 +85,7 @@ export interface IPatient {
     patient_id: string;
     owner_id: string;
     createdDate: Date;
-    content: IFile[];
+    content: IFileDoc[];
     sharedWith: Map<string, string[]>;
     history: IHistoryEvent[];
     accessRequests: string[];

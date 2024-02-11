@@ -1,8 +1,8 @@
 import { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { Patient } from '../models';
-import { EventType, IFile, IHistoryEvent } from '../models/Patient';
-import User, { IUserDoc } from '../models/User';
+import { EventType, IFile, IFileDoc, IHistoryEvent } from '../models/Patient';
+import User, { IUser, IUserDoc } from '../models/User';
 
 /**
  * @api {get} /patients Get Patients
@@ -137,14 +137,37 @@ export const getPatientByPatientId = async (c: Context) => {
         return c.json({ patient, owner });
     }
 
-    if (user.address === owner?.address) {
-        return c.json({ patient, owner });
+    if (user._id.toString() === owner?._id.toString()) {
+        const users: { user: IUserDoc; files: IFileDoc[] }[] = [];
+
+        const sharedList = Array.from(patient.sharedWith, ([key, value]) => ({ key, value }));
+
+        await Promise.all(
+            sharedList.map(async (i) => {
+                const { key, value } = i;
+                const user = await User.findById(key);
+                const files: IFileDoc[] = [];
+
+                patient.content.forEach((f) => {
+                    if (value.includes(f._id?.toString() || '')) {
+                        files.push(f);
+                    }
+                });
+
+                if (user && files) {
+                    users.push({ user, files });
+                }
+            })
+        );
+
+        console.log(users);
+        return c.json({ patient, owner, sharedList: users });
     }
 
     const sharedWith = new Map(patient.sharedWith);
 
-    if (sharedWith.has(user.address)) {
-        const files = sharedWith.get(user.address);
+    if (sharedWith.has(user._id.toString())) {
+        const files = sharedWith.get(user._id.toString());
 
         patient.content = patient.content.filter((f) => files?.includes(f._id || ''));
 
@@ -492,8 +515,6 @@ export const addFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
     const { files } = await c.req.json();
 
-    console.log(files);
-
     if (!files || files.length === 0) {
         throw new HTTPException(400, { message: 'Files are required' });
     }
@@ -524,7 +545,6 @@ export const addFiles = async (c: Context) => {
         const event: IHistoryEvent = {
             eventType: EventType.FILE_ADDED,
             timestamp: new Date(),
-            fileName: f.name,
         };
 
         history.unshift(event);
@@ -597,17 +617,17 @@ export const deleteFiles = async (c: Context) => {
  */
 export const shareFiles = async (c: Context) => {
     const { patient_id } = c.req.param();
-    const { address, fileIds } = await c.req.json();
+    const { username, fileIds } = await c.req.json();
 
-    if (!address) {
-        throw new HTTPException(400, { message: 'Address is required' });
+    if (!username) {
+        throw new HTTPException(400, { message: 'Username is required' });
     }
 
     if (!fileIds || fileIds.length === 0) {
         throw new HTTPException(400, { message: 'File IDs are required' });
     }
 
-    const recipient = await User.findOne({ address });
+    const recipient = await User.findOne({ username });
 
     if (!recipient) {
         throw new HTTPException(404, { message: 'Recipient not found' });
@@ -625,11 +645,7 @@ export const shareFiles = async (c: Context) => {
         throw new HTTPException(401, { message: 'Not authorized' });
     }
 
-    if (!user.address) {
-        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
-    }
-
-    if (user.address === address) {
+    if (user._id.toString() === recipient._id.toString()) {
         throw new HTTPException(400, { message: 'You cannot share with yourself' });
     }
 
@@ -639,7 +655,7 @@ export const shareFiles = async (c: Context) => {
 
     const sharedWith = new Map(patient.sharedWith);
 
-    const sharedWithfiles = new Set(sharedWith.get(address as string) || []);
+    const sharedWithfiles = new Set(sharedWith.get(recipient._id.toString()) || []);
 
     fileIds.forEach((id: string) => {
         sharedWithfiles.add(id);
@@ -647,17 +663,17 @@ export const shareFiles = async (c: Context) => {
 
     const history = [...patient.history];
 
-    if (sharedWithfiles.size > (sharedWith.get(address as string)?.length || 0)) {
+    if (sharedWithfiles.size > (sharedWith.get(recipient._id.toString())?.length || 0)) {
         const sharedEvent: IHistoryEvent = {
             eventType: EventType.SHARED_WITH,
             timestamp: new Date(),
-            with: address as string,
+            with: recipient._id.toString(),
         };
 
         history.unshift(sharedEvent);
     }
 
-    sharedWith.set(address as string, Array.from(sharedWithfiles));
+    sharedWith.set(recipient._id.toString(), Array.from(sharedWithfiles));
 
     const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history }, { new: true });
 
