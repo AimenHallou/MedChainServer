@@ -87,12 +87,6 @@ export const getSharedWithMe = async (c: Context) => {
 
     let searchQuery = {};
 
-    if (filter) {
-        searchQuery = {
-            $or: [{ patient_id: { $regex: filter, $options: 'i' } }, { owner: { $regex: filter, $options: 'i' } }],
-        };
-    }
-
     let sort = {};
 
     if (sortBy === 'createdAt') {
@@ -107,11 +101,36 @@ export const getSharedWithMe = async (c: Context) => {
         throw new HTTPException(401, { message: 'Not authorized' });
     }
 
-    const totalCount = await Patient.countDocuments({ sharedWith: { $elemMatch: { $eq: user._id } }, ...searchQuery });
-    const patients = await Patient.find({ sharedWith: { $elemMatch: { $eq: user._id } }, ...searchQuery }, null, {
-        limit: limit as number,
-        skip: (page as number) * (limit as number),
-    }).sort(sort);
+    if (filter) {
+        searchQuery = {
+            $or: [{ patient_id: { $regex: filter, $options: 'i' } }, { owner: { $regex: filter, $options: 'i' } }],
+        };
+    }
+
+    const totalCount = await Patient.countDocuments({
+        owner_id: { $ne: user.id },
+        [`sharedWith.${user.id}`]: {
+            $exists: true,
+        },
+        ...searchQuery,
+    });
+
+    const patients = await Patient.find(
+        {
+            owner_id: { $ne: user.id },
+            [`sharedWith.${user.id}`]: {
+                $exists: true,
+            },
+            ...searchQuery,
+        },
+        null,
+        {
+            limit: limit as number,
+            skip: (page as number) * (limit as number),
+        }
+    ).sort(sort);
+
+    console.log(user.id);
 
     const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
 
