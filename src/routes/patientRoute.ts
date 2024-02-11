@@ -22,6 +22,8 @@ patients.post('/:patient_id/share-files', protect, (c) => patient.shareFiles(c))
 
 patients.post('/:patient_id/request-access', protect, (c) => patient.requestAccess(c));
 
+patients.post('/:patient_id/manage-access', protect, (c) => patient.manageAccess(c));
+
 patients.post('/:patient_id/cancel-access-request', protect, (c) => patient.cancelRequest(c));
 
 patients.post('/:patient_id/reject-access-request', protect, (c) => patient.rejectRequest(c));

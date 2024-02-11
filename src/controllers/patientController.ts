@@ -672,6 +672,80 @@ export const shareFiles = async (c: Context) => {
 
     const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history, accessRequests }, { new: true });
 
-    console.log(updatedPatient?.sharedWith);
+    return c.json({ patient: updatedPatient, message: 'Patient shared' });
+};
+
+export const manageAccess = async (c: Context) => {
+    const { patient_id } = c.req.param();
+    const { username, fileIds = [] } = await c.req.json();
+
+    if (!username) {
+        throw new HTTPException(400, { message: 'Username is required' });
+    }
+
+    if (!fileIds) {
+        throw new HTTPException(400, { message: 'File IDs are required' });
+    }
+
+    const recipient = await User.findOne({ username });
+
+    if (!recipient) {
+        throw new HTTPException(404, { message: 'Recipient not found' });
+    }
+
+    const patient = await Patient.findOne({ patient_id });
+
+    if (!patient) {
+        throw new HTTPException(404, { message: 'Patient not found' });
+    }
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        throw new HTTPException(401, { message: 'Not authorized' });
+    }
+
+    if (user._id.toString() === recipient._id.toString()) {
+        throw new HTTPException(400, { message: 'You cannot share with yourself' });
+    }
+
+    if (patient.owner_id !== user._id.toString()) {
+        throw new HTTPException(400, { message: 'You are not the owner of this patient' });
+    }
+
+    const sharedWith = new Map(patient.sharedWith);
+
+    const sharedWithfiles = new Set(fileIds as string[]);
+
+    const history = [...patient.history];
+
+    if (sharedWithfiles.size > (sharedWith.get(recipient._id.toString())?.length || 0)) {
+        const sharedEvent: IHistoryEvent = {
+            eventType: EventType.SHARED_WITH,
+            timestamp: new Date(),
+            with: recipient._id.toString(),
+        };
+
+        history.unshift(sharedEvent);
+    }
+
+    sharedWith.set(recipient._id.toString(), Array.from(sharedWithfiles));
+
+    if (sharedWithfiles.size === 0) {
+        const revokedEvent: IHistoryEvent = {
+            eventType: EventType.REVOKED_ACCESS,
+            timestamp: new Date(),
+            with: recipient._id.toString(),
+        };
+
+        history.unshift(revokedEvent);
+
+        sharedWith.delete(recipient._id.toString());
+    }
+
+    const accessRequests = patient.accessRequests.filter((req) => req !== recipient._id.toString());
+
+    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history, accessRequests }, { new: true });
+
     return c.json({ patient: updatedPatient, message: 'Patient shared' });
 };
