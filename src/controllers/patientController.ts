@@ -28,8 +28,6 @@ export const getPatients = async (c: Context) => {
         sort = { patient_id: Number(sortOrder) };
     }
 
-    console.log(sort);
-
     const totalCount = await Patient.countDocuments(searchQuery);
     const patients = await Patient.find(searchQuery, null, { limit: limit as number, skip: (page as number) * (limit as number) }).sort(sort);
 
@@ -132,12 +130,14 @@ export const getPatientByPatientId = async (c: Context) => {
 
     const owner = await User.findById(patient.owner_id);
 
-    console.log(owner);
-
     const user: IUserDoc = c.get('user');
 
     if (!user) {
         patient.content = [];
+        return c.json({ patient, owner });
+    }
+
+    if (user.address === owner?.address) {
         return c.json({ patient, owner });
     }
 
@@ -150,6 +150,8 @@ export const getPatientByPatientId = async (c: Context) => {
 
         return c.json({ patient, owner });
     }
+
+    patient.content = [];
 
     return c.json({ patient, owner });
 };
@@ -337,7 +339,7 @@ export const acceptRequest = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -396,7 +398,7 @@ export const rejectRequest = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -454,7 +456,7 @@ export const unshareWith = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -512,7 +514,7 @@ export const addFiles = async (c: Context) => {
         throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
@@ -574,7 +576,7 @@ export const deleteFiles = async (c: Context) => {
         throw new Error('No address found for user. Link your MetaMask to your account.');
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
@@ -631,7 +633,7 @@ export const shareFiles = async (c: Context) => {
         throw new HTTPException(400, { message: 'You cannot share with yourself' });
     }
 
-    if (patient.owner_id === user._id.toString()) {
+    if (patient.owner_id !== user._id.toString()) {
         throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
