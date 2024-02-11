@@ -16,6 +16,8 @@ patients.post('/', protect, (c) => patient.createPatient(c));
 
 patients.post('/:patient_id/add-files', protect, (c) => patient.addFiles(c));
 
+patients.post('/:patient_id/edit-file', protect, (c) => patient.editFile(c));
+
 patients.delete('/:patient_id/delete-files', protect, (c) => patient.deleteFiles(c));
 
 patients.post('/:patient_id/share-files', protect, (c) => patient.shareFiles(c));

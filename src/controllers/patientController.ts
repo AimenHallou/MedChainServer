@@ -431,6 +431,63 @@ export const addFiles = async (c: Context) => {
 };
 
 /**
+ * @api {post} /patients/:patient_id/edit-file Edit File
+ * @apiGroup Patients
+ * @access Private
+ */
+export const editFile = async (c: Context) => {
+    const { patient_id } = c.req.param();
+    const { fileId, name, dataType } = await c.req.json();
+
+    if (!fileId) {
+        throw new HTTPException(400, { message: 'File ID is required' });
+    }
+
+    if (!name) {
+        throw new HTTPException(400, { message: 'Name is required' });
+    }
+
+    const patient = await Patient.findOne({ patient_id });
+
+    if (!patient) {
+        throw new HTTPException(404, { message: 'Patient not found' });
+    }
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        throw new HTTPException(401, { message: 'Not authorized' });
+    }
+
+    if (patient.owner_id !== user._id.toString()) {
+        throw new HTTPException(400, { message: 'You are not the owner of this patient' });
+    }
+
+    const history = [...patient.history];
+
+    const event: IHistoryEvent = {
+        eventType: EventType.FILE_UPDATED,
+        timestamp: new Date(),
+    };
+
+    history.unshift(event);
+
+    const content = patient.content.map((f) => {
+        if (f._id?.toString() === fileId) {
+            f.name = name;
+            f.dataType = dataType;
+            return f;
+        }
+
+        return f;
+    });
+
+    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { content, history }, { new: true });
+
+    return c.json({ patient: updatedPatient, message: 'File edited' });
+};
+
+/**
  * @api {delete} /patients/:patient_id/delete-files Delete Files
  * @apiGroup Patients
  * @access Private
