@@ -84,14 +84,10 @@ export const createPatient = async (c: Context) => {
         throw new HTTPException(401, { message: 'Not authorized' });
     }
 
-    if (!user.address) {
-        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
-    }
-
     const createdEvent: IHistoryEvent = {
         eventType: EventType.CREATED,
         timestamp: new Date(),
-        by: user.address,
+        by: user._id,
     };
 
     const history = [createdEvent];
@@ -154,7 +150,7 @@ export const getPatientByPatientId = async (c: Context) => {
                     }
                 });
 
-                if (user && files) {
+                if (user && files && user._id.toString() !== patient.owner_id) {
                     sharedList.push({ user, files });
                 }
             })
@@ -166,7 +162,7 @@ export const getPatientByPatientId = async (c: Context) => {
             patient.accessRequests.map(async (id) => {
                 const user = await User.findById(id);
 
-                if (user) {
+                if (user && user._id.toString() !== patient.owner_id) {
                     accessRequests.push(user);
                 }
             })
@@ -197,41 +193,56 @@ export const getPatientByPatientId = async (c: Context) => {
  */
 export const transferOwnership = async (c: Context) => {
     const { patient_id } = c.req.param();
-    const { address } = await c.req.json();
+    const { username, password } = await c.req.json();
+    if (!username) {
+        throw new HTTPException(400, { message: 'Username of recipient is required' });
+    }
+
+    if (!password) {
+        throw new HTTPException(400, { message: 'Password is required' });
+    }
 
     const patient = await Patient.findOne({ patient_id });
 
     if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
+        throw new HTTPException(404, { message: 'Patient not found' });
     }
 
-    const user: IUserDoc = c.get('user');
+    const recipient = await User.findOne({ username });
+
+    if (!recipient) {
+        throw new HTTPException(404, { message: 'Recipient not found' });
+    }
+
+    let user = c.get('user');
+
+    user = await User.findById(user._id);
 
     if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
+        throw new HTTPException(401, { message: 'Not authorized' });
     }
 
-    if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
+    if (!(await user.mathPassword(password.toString()))) {
+        throw new HTTPException(400, { message: 'Invalid credentials' });
     }
 
-    if (patient.owner_id === user._id.toString()) {
-        c.status(400);
-        throw new Error('You are the owner of this patient');
+    if (user._id.toString() === recipient._id.toString()) {
+        throw new HTTPException(400, { message: 'You cannot transfer ownership to yourself' });
+    }
+
+    if (patient.owner_id !== user._id.toString()) {
+        throw new HTTPException(400, { message: 'You are not the owner of this patient' });
     }
 
     const transferredEvent: IHistoryEvent = {
         eventType: EventType.TRANSFERRED_OWNERSHIP,
         timestamp: new Date(),
-        to: address,
+        to: recipient._id.toString(),
     };
 
     const history = [transferredEvent, ...patient.history];
 
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { owner: address, history }, { new: true });
+    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { owner_id: recipient._id.toString(), history }, { new: true });
 
     return c.json({ patient: updatedPatient, message: 'Ownership transferred' });
 };
@@ -273,7 +284,7 @@ export const requestAccess = async (c: Context) => {
     const requestedEvent: IHistoryEvent = {
         eventType: EventType.REQUESTED_ACCESS,
         timestamp: new Date(),
-        by: user._id,
+        by: user._id.toString(),
     };
 
     const history = [requestedEvent, ...patient.history];
@@ -323,75 +334,6 @@ export const cancelRequest = async (c: Context) => {
 };
 
 /**
- * @api {post} /patients/:patient_id/accept-request Accept Request
- * @apiGroup Patients
- * @access Private
- */
-export const acceptRequest = async (c: Context) => {
-    const { patient_id } = c.req.param();
-    const { address, files } = await c.req.json();
-
-    if (!address) {
-        c.status(400);
-        throw new Error('Address is required');
-    }
-
-    if (!files || files.length === 0) {
-        c.status(400);
-        throw new Error('Files are required');
-    }
-
-    const patient = await Patient.findOne({ patient_id });
-
-    if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
-    }
-
-    const user: IUserDoc = c.get('user');
-
-    if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
-    }
-
-    if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
-    }
-
-    if (patient.owner_id !== user._id.toString()) {
-        c.status(400);
-        throw new Error('You are not the owner of this patient');
-    }
-
-    if (!patient.accessRequests.includes(address)) {
-        c.status(400);
-        throw new Error('No access request found for this address');
-    }
-
-    const accessRequests = patient.accessRequests.filter((req) => req !== address);
-
-    const sharedWith = new Map(patient.sharedWith);
-
-    const filesList = files.map((f: File) => f.name);
-
-    sharedWith.set(address, filesList);
-
-    const acceptedEvent: IHistoryEvent = {
-        eventType: EventType.GRANTED_ACCESS,
-        timestamp: new Date(),
-        with: address,
-    };
-
-    const history = [acceptedEvent, ...patient.history];
-
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, accessRequests, history }, { new: true });
-
-    return c.json({ patient: updatedPatient, message: 'Access request accepted' });
-};
-
-/**
  * @api {post} /patients/:patient_id/reject-request Reject Request
  * @apiGroup Patients
  * @access Private
@@ -410,10 +352,6 @@ export const rejectRequest = async (c: Context) => {
 
     if (!user) {
         throw new HTTPException(401, { message: 'Not authorized' });
-    }
-
-    if (!user.address) {
-        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
     if (patient.owner_id !== user._id.toString()) {
@@ -440,66 +378,6 @@ export const rejectRequest = async (c: Context) => {
 };
 
 /**
- * @api {post} /patients/:patient_id/unshare-with Unshare With
- * @apiGroup Patients
- * @access Private
- */
-export const unshareWith = async (c: Context) => {
-    const { patient_id } = c.req.param();
-    const { address } = await c.req.json();
-
-    if (!address) {
-        c.status(400);
-        throw new Error('Address is required');
-    }
-
-    const patient = await Patient.findOne({ patient_id });
-
-    if (!patient) {
-        c.status(404);
-        throw new Error('Patient not found');
-    }
-
-    const user: IUserDoc = c.get('user');
-
-    if (!user) {
-        c.status(401);
-        throw new Error('Not authorized');
-    }
-
-    if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
-    }
-
-    if (patient.owner_id !== user._id.toString()) {
-        c.status(400);
-        throw new Error('You are not the owner of this patient');
-    }
-
-    if (!patient.sharedWith.has(address)) {
-        c.status(400);
-        throw new Error('Patient not shared with this address');
-    }
-
-    const sharedWith = new Map(patient.sharedWith);
-
-    sharedWith.delete(address);
-
-    const unsharedEvent: IHistoryEvent = {
-        eventType: EventType.UN_SHARED_WITH,
-        timestamp: new Date(),
-        with: address,
-    };
-
-    const history = [unsharedEvent, ...patient.history];
-
-    const updatedPatient = await Patient.findOneAndUpdate({ patient_id }, { sharedWith, history }, { new: true });
-
-    return c.json({ patient: updatedPatient, message: 'Patient unshared' });
-};
-
-/**
  * @api {post} /patients/:patient_id/add-file Add File
  * @apiGroup Patients
  * @access Private
@@ -522,10 +400,6 @@ export const addFiles = async (c: Context) => {
 
     if (!user) {
         throw new HTTPException(401, { message: 'Not authorized' });
-    }
-
-    if (!user.address) {
-        throw new HTTPException(400, { message: 'No address found for user. Link your MetaMask to your account.' });
     }
 
     if (patient.owner_id !== user._id.toString()) {
@@ -584,15 +458,21 @@ export const deleteFiles = async (c: Context) => {
         throw new Error('Not authorized');
     }
 
-    if (!user.address) {
-        c.status(400);
-        throw new Error('No address found for user. Link your MetaMask to your account.');
-    }
-
     if (patient.owner_id !== user._id.toString()) {
         c.status(400);
         throw new Error('You are not the owner of this patient');
     }
+
+    const history = [...patient.history];
+
+    fileIds.forEach((id: string) => {
+        const event: IHistoryEvent = {
+            eventType: EventType.FILE_REMOVED,
+            timestamp: new Date(),
+        };
+
+        history.unshift(event);
+    });
 
     const content = patient.content.filter((f) => {
         return !fileIds.includes(f._id?.toString());

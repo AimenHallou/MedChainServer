@@ -28,14 +28,6 @@ patients.post('/:patient_id/cancel-access-request', protect, (c) => patient.canc
 
 patients.post('/:patient_id/reject-access-request', protect, (c) => patient.rejectRequest(c));
 
-// patients.post('/:patient_id/accept-request', protect, (c) => patient.acceptRequest(c));
-
-// patients.post('/:patient_id/request-access', protect, (c) => patient.requestAccess(c));
-
-// patients.post('/:patient_id/cancel-request', protect, (c) => patient.cancelRequest(c));
-
-// patients.post('/:patient_id/unshare-with', protect, (c) => patient.unshareWith(c));
-
-// patients.post('/:patient_id/transfer-ownership', protect, (c) => patient.transferOwnership(c));
+patients.post('/:patient_id/transfer-ownership', protect, (c) => patient.transferOwnership(c));
 
 export default patients;
