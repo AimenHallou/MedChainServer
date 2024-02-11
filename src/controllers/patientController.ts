@@ -37,6 +37,88 @@ export const getPatients = async (c: Context) => {
 };
 
 /**
+ * @api {get} /patients/my-patients Get My Patients
+ * @apiGroup Patients
+ * @access Private
+ */
+export const getMyPatients = async (c: Context) => {
+    const { limit = 15, page = 0, filter, sortBy = 'createdAt', sortOrder = -1 } = c.req.query();
+
+    let searchQuery = {};
+
+    if (filter) {
+        searchQuery = {
+            $or: [{ patient_id: { $regex: filter, $options: 'i' } }, { owner: { $regex: filter, $options: 'i' } }],
+        };
+    }
+
+    let sort = {};
+
+    if (sortBy === 'createdAt') {
+        sort = { createdAt: Number(sortOrder) };
+    } else if (sortBy === 'patient_id') {
+        sort = { patient_id: Number(sortOrder) };
+    }
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        throw new HTTPException(401, { message: 'Not authorized' });
+    }
+
+    const totalCount = await Patient.countDocuments({ owner_id: user._id, ...searchQuery });
+    const patients = await Patient.find({ owner_id: user._id, ...searchQuery }, null, {
+        limit: limit as number,
+        skip: (page as number) * (limit as number),
+    }).sort(sort);
+
+    const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
+
+    return c.json({ patients, hasMore, totalCount });
+};
+
+/**
+ * @api {get} /patients/shared-with-me Get Shared With Me
+ * @apiGroup Patients
+ * @access Private
+ */
+export const getSharedWithMe = async (c: Context) => {
+    const { limit = 15, page = 0, filter, sortBy = 'createdAt', sortOrder = -1 } = c.req.query();
+
+    let searchQuery = {};
+
+    if (filter) {
+        searchQuery = {
+            $or: [{ patient_id: { $regex: filter, $options: 'i' } }, { owner: { $regex: filter, $options: 'i' } }],
+        };
+    }
+
+    let sort = {};
+
+    if (sortBy === 'createdAt') {
+        sort = { createdAt: Number(sortOrder) };
+    } else if (sortBy === 'patient_id') {
+        sort = { patient_id: Number(sortOrder) };
+    }
+
+    const user: IUserDoc = c.get('user');
+
+    if (!user) {
+        throw new HTTPException(401, { message: 'Not authorized' });
+    }
+
+    const totalCount = await Patient.countDocuments({ sharedWith: { $elemMatch: { $eq: user._id } }, ...searchQuery });
+    const patients = await Patient.find({ sharedWith: { $elemMatch: { $eq: user._id } }, ...searchQuery }, null, {
+        limit: limit as number,
+        skip: (page as number) * (limit as number),
+    }).sort(sort);
+
+    const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
+
+    return c.json({ patients, hasMore, totalCount });
+};
+
+/**
  * @api {get} /patientsCount Get Patients Count
  * @apiGroup Patients
  * @access Public

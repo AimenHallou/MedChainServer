@@ -6,6 +6,10 @@ const patients = new Hono();
 
 patients.get('/', (c) => patient.getPatients(c));
 
+patients.get('/my-patients', protect, (c) => patient.getMyPatients(c));
+
+patients.get('/shared-with-me', protect, (c) => patient.getSharedWithMe(c));
+
 patients.get('/count', (c) => patient.getPatientsCount(c));
 
 patients.get('/recent/:limit', (c) => patient.getRecentPatients(c));
