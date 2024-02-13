@@ -14,7 +14,7 @@ patients.get('/count', (c) => patient.getPatientsCount(c));
 
 patients.get('/recent/:limit', (c) => patient.getRecentPatients(c));
 
-patients.get('/:patient_id', protect, (c) => patient.getPatientByPatientId(c));
+patients.get('/:patient_id', (c) => patient.getPatientByPatientId(c));
 
 patients.post('/', protect, (c) => patient.createPatient(c));
 
