@@ -50,7 +50,7 @@ app.notFound((c) => {
     return error;
 });
 
-const port = Bun.env.PORT || 4000;
+const port = Bun.env.PORT || 3000;
 
 export default {
     port,
