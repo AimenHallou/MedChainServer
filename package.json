@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun build src/index.ts --outdir ./out"
+  },
+  "dependencies": {
+    "hono": "^3.12.8",
+    "mongoose": "^8.1.1",
+    "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0"
+  }
+}
