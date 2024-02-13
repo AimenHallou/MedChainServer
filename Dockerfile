@@ -1,5 +1,14 @@
-FROM oven/bun
-COPY . .
+FROM bunshinsaba/bun
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install app dependencies
+COPY package*.json ./
 RUN bun install
-EXPOSE 4000
-CMD ["bun", "src/index.ts"]
+
+# Bundle app source
+COPY . .
+
+EXPOSE 3000
+CMD ["bun", "start"]
