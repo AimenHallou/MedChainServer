@@ -17,7 +17,7 @@ const userSchema = new Schema<IUserDoc>(
     {
         username: { type: String, required: true, unique: true },
         password: { type: String, required: true },
-        address: { type: String, unique: true },
+        address: { type: String },
         name: { type: String },
         healthcareType: { type: String },
         organizationName: { type: String },
