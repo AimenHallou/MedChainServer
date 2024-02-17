@@ -4,7 +4,7 @@ import { protect } from '../middlewares';
 
 const patients = new Hono();
 
-patients.get('/', (c) => patient.getPatients(c));
+patients.get('/', protect, (c) => patient.getPatients(c));
 
 patients.get('/my-patients', protect, (c) => patient.getMyPatients(c));
 
@@ -12,9 +12,9 @@ patients.get('/shared-with-me', protect, (c) => patient.getSharedWithMe(c));
 
 patients.get('/count', (c) => patient.getPatientsCount(c));
 
-patients.get('/recent/:limit', (c) => patient.getRecentPatients(c));
+patients.get('/recent/:limit', protect, (c) => patient.getRecentPatients(c));
 
-patients.get('/:patient_id', (c) => patient.getPatientByPatientId(c));
+patients.get('/:patient_id', protect, (c) => patient.getPatientByPatientId(c));
 
 patients.post('/', protect, (c) => patient.createPatient(c));
 

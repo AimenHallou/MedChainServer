@@ -130,8 +130,6 @@ export const getSharedWithMe = async (c: Context) => {
         }
     ).sort(sort);
 
-    console.log(user.id);
-
     const hasMore = ((page as number) + 1) * (limit as number) < totalCount;
 
     return c.json({ patients, hasMore, totalCount });
@@ -227,7 +225,7 @@ export const getPatientByPatientId = async (c: Context) => {
 
     const owner = await User.findById(patient.owner_id);
 
-    const user: IUserDoc = c.get('user');
+    const user: IUserDoc = c.get('user');   
 
     if (!user) {
         patient.content = [];
