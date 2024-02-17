@@ -10,7 +10,7 @@ patients.get('/my-patients', protect, (c) => patient.getMyPatients(c));
 
 patients.get('/shared-with-me', protect, (c) => patient.getSharedWithMe(c));
 
-patients.get('/count', (c) => patient.getPatientsCount(c));
+patients.get('/count', protect, (c) => patient.getPatientsCount(c));
 
 patients.get('/recent/:limit', protect, (c) => patient.getRecentPatients(c));
 
