@@ -1,6 +1,5 @@
 import mongoose, { Document, Schema, model } from 'mongoose';
 
-// Define an enum for the possible values of a field in the history objects
 export enum EventType {
     CREATED = 'created',
     UPDATED = 'updated',
@@ -31,7 +30,7 @@ export interface IHistoryEvent {
 const historyEventSchema = new Schema<IHistoryEvent>({
     eventType: {
         type: String,
-        enum: Object.values(EventType), // Use the values of the enum as possible values
+        enum: Object.values(EventType),
         required: true,
     },
     by: {
@@ -89,6 +88,7 @@ export interface IPatient {
     sharedWith: Map<string, string[]>;
     history: IHistoryEvent[];
     accessRequests: string[];
+    isBlockchainPatient: boolean;
 }
 
 export interface IPatientDoc extends IPatient, Document {}
@@ -101,6 +101,7 @@ const patientSchema = new Schema<IPatientDoc>(
         sharedWith: { type: Map, of: [{ type: String }], default: new Map() },
         history: [historyEventSchema],
         accessRequests: [{ type: String }],
+        isBlockchainPatient: { type: Boolean, required: true, default: false },
     },
     {
         timestamps: true,
