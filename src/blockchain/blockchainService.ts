@@ -1,16 +1,14 @@
 // src/blockchain/blockchainService.ts
 import Web3 from "web3";
-
 import fs from "fs";
-const contractJson = JSON.parse(
-  fs.readFileSync("./build/contracts/PatientRegistry.json", "utf8")
-);
-// import PatientRegistryContract from "../../build/contracts/PatientRegistry.json";
+
+// Load the contract ABI and address
+const contractJson = JSON.parse(fs.readFileSync("./build/contracts/PatientRegistry.json", "utf8"));
+const contractAddresses = JSON.parse(fs.readFileSync("./contractAddresses.json", "utf8"));
 
 const web3 = new Web3("HTTP://127.0.0.1:8545");
-const contractAddress = "0x70b728B4F120dFe55BFd7af179d2e330F5490f95";
 const contractABI = contractJson.abi;
-const patientRegistry = new web3.eth.Contract(contractABI, contractAddress);
+const patientRegistry = new web3.eth.Contract(contractABI, contractAddresses.PatientRegistry);
 
 export const createPatientOnBlockchain = async (
   patientData: any,
