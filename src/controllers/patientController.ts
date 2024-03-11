@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { Patient } from "../models";
 import { EventType, IFile, IFileDoc, IHistoryEvent } from "../models/Patient";
 import User, { IUser, IUserDoc } from "../models/User";
+import { createPatientOnBlockchain } from '../blockchain/blockchainService';
 
 /**
  * @api {get} /patients Get Patients
@@ -214,54 +215,54 @@ export const createPatient = async (c: Context) => {
     accessRequests,
     isBlockchainPatient,
   } = await c.req.json();
-  //check if the owner is has an address linked
+  
   const currentUser: IUserDoc = c.get("user");
+  console.log(currentUser.address)
+  if (isBlockchainPatient) {
     if (!currentUser.address) {
-        throw new HTTPException(400, {
+      throw new HTTPException(400, {
         message: "You need to link an address to create a patient on the blockchain.",
-        });
+      });
     }
+    
+    try {
+      console.log('Creating patient on blockchain:', { patient_id, content }, currentUser.address)
+      const blockchainResponse = await createPatientOnBlockchain({ patient_id, content }, currentUser.address);
+      console.log('Patient added to blockchain:', blockchainResponse);
+    } catch (error) {
+      throw new HTTPException(500, { message: "Failed to add patient to blockchain" });
+    }
+  }
+  
   if (!patient_id) {
     throw new HTTPException(400, { message: "Patient id is required" });
   }
 
   const patientExists = await Patient.findOne({ patient_id });
-
   if (patientExists) {
     throw new HTTPException(400, { message: "Patient with id already exists" });
   }
 
-  const user: IUserDoc = c.get("user");
-
-  if (!user) {
+  if (!currentUser) {
     throw new HTTPException(401, { message: "Not authorized" });
   }
 
-  const createdEvent: IHistoryEvent = {
-    eventType: EventType.CREATED,
-    timestamp: new Date(),
-    by: user._id,
-  };
+  try {
+    const patient = await Patient.create({
+      patient_id,
+      owner_id: currentUser._id,
+      content,
+      sharedWith,
+      history: [{ eventType: EventType.CREATED, timestamp: new Date(), by: currentUser._id }],
+      accessRequests,
+      isBlockchainPatient,
+    });
 
-  const history = [createdEvent];
-
-  const patient = await Patient.create({
-    patient_id,
-    owner_id: user._id,
-    content,
-    sharedWith,
-    history,
-    accessRequests,
-    isBlockchainPatient,
-  });
-
-  if (!patient) {
-    c.status(400);
-    throw new Error("Invalid patient data");
+    c.status(201);
+    return c.json({ patient });
+  } catch (error) {
+    throw new HTTPException(500, { message: "Failed to create patient" });
   }
-
-  c.status(201);
-  return c.json({ patient });
 };
 
 /**

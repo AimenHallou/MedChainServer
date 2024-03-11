@@ -87,7 +87,6 @@ export const getMe = async (c: Context) => {
     if (!user) {
         throw new HTTPException(401, { message: 'Not authorized' });
     }
-
     return c.json({ user });
 };
 
@@ -140,6 +139,7 @@ export const linkAddress = async (c: Context) => {
 
     const updated = await User.findByIdAndUpdate(user._id, { address }, { new: true });
 
+    console.log('updated', updated);
     return c.json({ user: updated, message: 'Address linked successfully' });
 };
 
