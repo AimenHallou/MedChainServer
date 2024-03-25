@@ -3,7 +3,22 @@ import { HTTPException } from "hono/http-exception";
 import { Patient } from "../models";
 import { EventType, IFile, IFileDoc, IHistoryEvent } from "../models/Patient";
 import User, { IUser, IUserDoc } from "../models/User";
-import { createPatientOnBlockchain } from '../blockchain/blockchainService';
+import {
+  createPatientOnBlockchain,
+  getPatientAddressFromBlockchain,
+  getPatientHistoryFromBlockchain,
+} from "../blockchain/blockchainService";
+
+interface PatientBlockchainAddress {
+  owner: string;
+  patient_id: string;
+  createdDate: number;
+}
+
+interface PatientBlockchainHistory {
+  historyEntries: string[];
+  txHashes: string[];
+}
 
 /**
  * @api {get} /patients Get Patients
@@ -215,25 +230,35 @@ export const createPatient = async (c: Context) => {
     accessRequests,
     isBlockchainPatient,
   } = await c.req.json();
-  
+
   const currentUser: IUserDoc = c.get("user");
-  console.log(currentUser.address)
+  console.log(currentUser.address);
   if (isBlockchainPatient) {
     if (!currentUser.address) {
       throw new HTTPException(400, {
-        message: "You need to link an address to create a patient on the blockchain.",
+        message:
+          "You need to link an address to create a patient on the blockchain.",
       });
     }
-    
+
     try {
-      console.log('Creating patient on blockchain:', { patient_id, content }, currentUser.address)
-      const blockchainResponse = await createPatientOnBlockchain({ patient_id, content }, currentUser.address);
-      console.log('Patient added to blockchain:', blockchainResponse);
+      console.log(
+        "Creating patient on blockchain:",
+        { patient_id, content },
+        currentUser.address
+      );
+      const blockchainResponse = await createPatientOnBlockchain(
+        { patient_id, content },
+        currentUser.address
+      );
+      console.log("Patient added to blockchain:", blockchainResponse);
     } catch (error) {
-      throw new HTTPException(500, { message: "Failed to add patient to blockchain" });
+      throw new HTTPException(500, {
+        message: "Failed to add patient to blockchain",
+      });
     }
   }
-  
+
   if (!patient_id) {
     throw new HTTPException(400, { message: "Patient id is required" });
   }
@@ -253,7 +278,13 @@ export const createPatient = async (c: Context) => {
       owner_id: currentUser._id,
       content,
       sharedWith,
-      history: [{ eventType: EventType.CREATED, timestamp: new Date(), by: currentUser._id }],
+      history: [
+        {
+          eventType: EventType.CREATED,
+          timestamp: new Date(),
+          by: currentUser._id,
+        },
+      ],
       accessRequests,
       isBlockchainPatient,
     });
@@ -283,6 +314,33 @@ export const getPatientByPatientId = async (c: Context) => {
 
   const user: IUserDoc = c.get("user");
 
+  if (patient.isBlockchainPatient) {
+    try {
+      const patientBlockchainAddress: PatientBlockchainAddress = await getPatientAddressFromBlockchain(patient.patient_id);
+      const patientBlockchainHistory: PatientBlockchainHistory | null = await getPatientHistoryFromBlockchain(patient.patient_id);
+  
+      console.log(`Patient blockchain address: ${patientBlockchainAddress.owner}`);
+      console.log(`Patient ID: ${patientBlockchainAddress.patient_id}`);
+      console.log(`Created Date: ${new Date(Number(patientBlockchainAddress.createdDate) * 1000).toISOString()}`);
+  
+      if (patientBlockchainHistory && patientBlockchainHistory.historyEntries && patientBlockchainHistory.txHashes) {
+        console.log("Patient blockchain history:");
+        patientBlockchainHistory.historyEntries.forEach((entry, index) => {
+          console.log(`History ${index + 1}: ${entry}`);
+        });
+        patientBlockchainHistory.txHashes.forEach((hash, index) => {
+          console.log(`TxHash ${index + 1}: ${hash}`);
+        });
+      } else {
+        console.log("Failed to retrieve patient history from the blockchain or history is empty.");
+      }
+    } catch (error) {
+      console.error("Error retrieving patient data from blockchain", error);
+      // Implement or use an appropriate error handling mechanism here
+      throw new Error("Failed to retrieve patient data from blockchain.");
+    }
+  }  
+  
   if (!user) {
     patient.content = [];
     return c.json({ patient, owner });

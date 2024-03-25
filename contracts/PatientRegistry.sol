@@ -201,4 +201,24 @@ contract PatientRegistry {
     ) public view returns (string[] memory, string[] memory) {
         return (patients[_patient_id].history, patients[_patient_id].txHashes);
     }
+
+    function updateTxHash(
+        string memory _patient_id,
+        string memory _newTxHash
+    ) public {
+        require(
+            bytes(patients[_patient_id].patient_id).length != 0,
+            "Patient does not exist!"
+        );
+        require(
+            patients[_patient_id].owner == msg.sender,
+            "Only the owner can update the txHash."
+        );
+
+        if (patients[_patient_id].txHashes.length > 0) {
+            patients[_patient_id].txHashes[0] = _newTxHash;
+        } else {
+            patients[_patient_id].txHashes.push(_newTxHash);
+        }
+    }
 }
